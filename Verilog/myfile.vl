@@ -1,0 +1,298 @@
+// Create a circuit that sums 2 bits and its output is the sum and carry (Half Adder)
+module half_adder(output sum, output carry, input a, input b);
+    xor(sum, a, b); //get Xor between a, b and the output will be put on sum 
+    and(carry, a, b); // The carry is (and gate between a&b)
+endmodule
+
+/* Create a full adder circuit By using tow Half adder circuit
+So, this circuit adds 3 bits, ex. (x, y, z)  
+add x, y in one half-adder, and the output will be s1 and c1
+add s1, z in another half adder and output will be Sum and c2 
+and then take or between these 2 carries (c1, c2) 
+*/  
+module full_adder(output sum, output carry, input x, input y, input z);
+    wire s1, c1, c2;
+    half_adder h1(s1, c1, x, y);
+    half_adder h2(sum, c2, s1, z);
+    or(carry, c1, c2);
+endmodule
+
+/* This is 4x1 Multiplixer which has 2 selectors s0,s1
+Based on this 2selectors We determine the output (0|1|2|3)
+-----------------------------------------------------------
+To determine the output from selectors we make some circuits in the following code:-
+c1 -> if input 00 it will output 1
+c2 -> if input 01 ~ ~ 1
+c3-> if input 01 -> 1
+c4 -> if input 11 -> 1
+Finally c5 take (or) to all this results and then the circuit with output (1) will be work
+*/ 
+module multi4to1(output o,input l0,input l1,input l2,input l3,input s0,input s1);
+    wire a,b,c,d; // This wires will be the output from (And-gates) between 2selectors
+    wire s0not,s1not; // generate not of s0 and s1
+    not(s0not,s0);
+    not(s1not,s1);
+    and(a,l0,s0not,s1not); // c1
+    and(b,l1,s0,s1not); // c2
+    and(c,l2,s0not,s1); // c3
+    and(d,l3,s0,s1); // c4
+    or(o,a,b,c,d); // c5
+endmodule
+
+
+//Test bench to Test Our circuits
+`timescale 1ns/1ns
+
+module curicut_tb();
+    reg [2:0]a; // first input in circuit represented in 3 bits 
+    reg [2:0]b; // Second input in circuit represented in 3 bits
+    reg x=0; // Logic 0
+    reg y=1; // Logic 1 
+    reg s0,s1; // selectors of MUX 
+    wire [2:0]g; // Output Of circuit wire
+
+    /* Connect first input (a) with 4x1MUX 
+       in the first 3 choices, it will produce a and except last one it becomes 0
+    */ 
+    wire a0,a1,a2; // output from Mux and (a)   
+
+    multi4to1 m1(.o(a0),.l0(a[0]),.l1(a[0]),.l2(a[0]),.l3(x),.s0(s0),.s1(s1));
+    multi4to1 m2(.o(a1),.l0(a[1]),.l1(a[1]),.l2(a[1]),.l3(x),.s0(s0),.s1(s1));
+    multi4to1 m3(.o(a2),.l0(a[2]),.l1(a[2]),.l2(a[2]),.l3(x),.s0(s0),.s1(s1));
+    
+    // This MUX will handle Cin Carry 
+    wire c ; // output from MUX 
+    multi4to1 mc(.o(c),.l0(x),.l1(x),.l2(y),.l3(y),.s0(s0),.s1(s1));
+
+    // get not of b
+    wire b0not,b1not,b2not; //Each wire will save the not of each bit 
+    not(b0not,b[0]); // Not-gate
+    not(b1not,b[1]);
+    not(b2not,b[2]);
+
+    /* in this 4x1 MUx:
+        first choice -> Logic 1 (00)
+        Second -> b (01)  
+        third and fourth -> ~b (10 & 11)
+    */
+    multi4to1 m4(.o(b0),.l0(y),.l1(b[0]),.l2(b0not),.l3(b0not),.s0(s0),.s1(s1));
+    multi4to1 m5(.o(b1),.l0(y),.l1(b[1]),.l2(b1not),.l3(b1not),.s0(s0),.s1(s1));
+    multi4to1 m6(.o(b2),.l0(y),.l1(b[2]),.l2(b2not),.l3(b2not),.s0(s0),.s1(s1));
+
+    wire c1 , c2 , c3 ; // To save output carries 
+
+    // This full adder take 3 input (a[0] , b[0] , c(generated in above mux (cin))) 
+    // and output will be g[0] and c1 
+    full_adder f1(.sum(g[0]),.carry(c1),.x(a0),.y(b0),.z(c));
+    // this take a[1] b[1] and the carry which generated from above full adder(c1) and output carry c2 & g[2]
+    full_adder f2(.sum(g[1]),.carry(c2),.x(a1),.y(b1),.z(c1));
+    // this take a[2] b[2] and c2 and generate g[2] and c3
+    full_adder f3(.sum(g[2]),.carry(c3),.x(a2),.y(b2),.z(c2));
+
+    // Generate test cases 
+    initial begin
+        $dumpfile("curicut_tb.vcd");
+        $dumpvars(0,curicut_tb);
+        assign a=000;
+        assign b=000;
+        assign s0=0;
+        assign s1=0;  // Generate A - 1 
+        #10;
+        assign a=000;
+        assign b=000;
+        assign s0=0;
+        assign s1=1; // A + B
+        #10;
+        assign a=000;
+        assign b=000;
+        assign s0=1;
+        assign s1=0; // A - B
+        #10;
+        assign a=000;
+        assign b=000;
+        assign s0=1;
+        assign s1=1; // -B 
+        #10;
+        assign a=000;
+        assign b=001;
+        assign s0=0;
+        assign s1=0; // A - 1 
+        #10;
+        assign a=000;
+        assign b=001;
+        assign s0=0;
+        assign s1=1;
+        #10;
+        assign a=000;
+        assign b=001;
+        assign s0=1;
+        assign s1=0;
+        #10;
+        assign a=000;
+        assign b=001;
+        assign s0=1;
+        assign s1=1;
+        #10;
+        assign a=000;
+        assign b=011;
+        assign s0=0;
+        assign s1=0;
+        #10;
+        assign a=000;
+        assign b=011;
+        assign s0=0;
+        assign s1=1;
+        #10;
+        assign a=000;
+        assign b=011;
+        assign s0=1;
+        assign s1=0;
+        #10;
+        assign a=000;
+        assign b=011;
+        assign s0=1;
+        assign s1=1;
+        #10;
+        assign a=000;
+        assign b=100;
+        assign s0=0;
+        assign s1=0;
+        #10;
+        assign a=000;
+        assign b=100;
+        assign s0=0;
+        assign s1=1;
+        #10;
+        assign a=000;
+        assign b=100;
+        assign s0=1;
+        assign s1=0;
+        #10;
+        assign a=000;
+        assign b=100;
+        assign s0=1;
+        assign s1=1;
+        #10;
+        assign a=000;
+        assign b=101;
+        assign s0=0;
+        assign s1=0;
+        #10;
+        assign a=000;
+        assign b=101;
+        assign s0=0;
+        assign s1=1;
+        #10;
+        assign a=000;
+        assign b=101;
+        assign s0=1;
+        assign s1=0;
+        #10;
+        assign a=000;
+        assign b=101;
+        assign s0=1;
+        assign s1=1;
+        #10;
+        assign a=010;
+        assign b=011;
+        assign s0=0; //A-1
+        assign s1=0;
+        #10;
+        assign a=010;
+        assign b=011;
+        assign s0=0;//A+B
+        assign s1=1;
+        #10;
+        assign a=010;
+        assign b=011;
+        assign s0=1;//A-B
+        assign s1=0;
+        #10;
+        assign a=010;
+        assign b=011;
+        assign s0=1;//-B
+        assign s1=1;
+        #10;
+        assign a=010;
+        assign b=100;
+        assign s0=0; //A-1
+        assign s1=0;
+        #10;
+        assign a=010;
+        assign b=100;
+        assign s0=0; //A+B
+        assign s1=1;
+        #10;
+        assign a=010;
+        assign b=100;
+        assign s0=1; //A-B
+        assign s1=0;
+        #10;
+        assign a=010;
+        assign b=100;
+        assign s0=1; //-B
+        assign s1=1;
+        #10;
+        assign a=010;
+        assign b=101;
+        assign s0=0; //A-1
+        assign s1=0;
+        #10;
+        assign a=010;
+        assign b=101;
+        assign s0=0; //A+B
+        assign s1=1;
+        #10;
+        assign a=010;
+        assign b=000;
+        assign s0=0; //A-1
+        assign s1=0;
+        #10;
+        assign a=010;
+        assign b=000;
+        assign s0=0;//A+B
+        assign s1=1;
+        #10;
+        assign a=010;
+        assign b=000;
+        assign s0=1;//A-B
+        assign s1=0;
+        #10;
+        assign a=010;
+        assign b=000;
+        assign s0=1;//-B
+        assign s1=1;
+        #10;
+        assign a=010;
+        assign b=001;
+        assign s0=0; //A-1
+        assign s1=0;
+        #10;
+        assign a=010;
+        assign b=001;
+        assign s0=0; //A+B
+        assign s1=1;
+        #10;
+        assign a=010;
+        assign b=001;
+        assign s0=1; //A-B
+        assign s1=0;
+        #10;
+        assign a=010;
+        assign b=001;
+        assign s0=1; //-B
+        assign s1=1;
+        #10;
+        assign a=010;
+        assign b=010;
+        assign s0=0; //A-1
+        assign s1=0;
+        #10;
+        assign a=010;
+        assign b=010;
+        assign s0=0; //A+B
+        assign s1=1;
+        
+    end
+ 
+endmodule
